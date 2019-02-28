@@ -127,7 +127,6 @@ class Integrate_Emma_WPForms {
      */
     function send_data_to_emma( $fields, $entry, $form_data, $entry_id ) {
 
-        // Get API key and CK Form ID
         $public_key = $private_key = $account_id = false;
         if( !empty( $form_data['settings']['be_emma_public_key'] ) )
             $public_key = sanitize_key( $form_data['settings']['be_emma_public_key'] );
@@ -144,30 +143,35 @@ class Integrate_Emma_WPForms {
         if( ! apply_filters( 'be_emma_process_form', true, $fields, $form_data ) )
             return;
 
-		require 'EmmaPHP/src/Emma.php';
-		$emma = new Emma( $account_id, $public_key, $private_key );
-
-        $email_field_id = $form_data['settings']['be_emma_field_email'];
+        $email_field_id = intval( $form_data['settings']['be_emma_field_email'] );
         $first_name_field_id = $form_data['settings']['be_emma_field_first_name'];
 		$last_name_field_id = $form_data['settings']['be_emma_field_last_name'];
 		$groups = $form_data['settings']['be_emma_groups'];
 		if( !empty( $groups ) )
 			$groups = array_filter( array_map( 'intval', explode( ',', str_replace( ', ', ',', $groups ) ) ) );
 
-		$member = array();
-		$fields = array();
+		$member = $member_fields = array();
 		if( !empty( $email_field_id ) && !empty( $fields[ $email_field_id ]['value'] ) )
 			$member['email'] = $fields[ $email_field_id ]['value'];
 		if( !empty( $first_name_field_id ) && !empty( $fields[ $first_name_field_id ]['value'] ) )
-			$fields['first_name'] = $fields[ $first_name_field_id ]['value'];
+			$member_fields['first_name'] = $fields[ $first_name_field_id ]['value'];
 		if( !empty( $last_name_field_id ) && !empty( $fields[ $last_name_field_id ]['value'] ) )
-			$fields['last_name'] = $fields[ $last_name_field_id ]['value'];
-		if( !empty( $fields ) )
-			$member['fields'] = $fields;
+			$member_fields['last_name'] = $fields[ $last_name_field_id ]['value'];
+		if( !empty( $member_fields ) )
+			$member['fields'] = $member_fields;
 		if( !empty( $groups ) )
 			$member['group_ids'] = $groups;
 
-		$req = $emma->membersAddSingle($member);
+		$url = 'https://api.e2ma.net/' . $account_id . '/members/add';
+		$auth = base64_encode( $public_key . ':' . $private_key );
+		$args = array(
+			'headers' => array(
+				'Authorization' => "Basic $auth",
+			),
+			'body' => json_encode( $member ),
+		);
+
+		$request = wp_remote_post( $url, $args );
 
     }
 
